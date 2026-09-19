@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { onboardTokenFromPath } from "@/lib/app-url";
 import { createClient } from "@/lib/supabase/client";
 
-export function LoginForm() {
+export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/app";
+  const next = redirectTo || searchParams.get("next");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,20 +23,32 @@ export function LoginForm() {
     const password = String(form.get("password") || "");
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    setLoading(false);
-
-    if (signInError) {
-      setError(signInError.message);
+    if (signInError || !data.user) {
+      setLoading(false);
+      setError(signInError?.message || "Could not sign in");
       return;
     }
 
-    router.push(next);
+    const destination = next || (await resolvePortal());
+    await fetch("/api/account/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: onboardTokenFromPath(destination) }),
+    });
+    setLoading(false);
+    router.push(destination);
     router.refresh();
+  }
+
+  async function resolvePortal() {
+    const response = await fetch("/api/me/portal");
+    const payload = (await response.json()) as { portal?: string };
+    return payload.portal || "/owner";
   }
 
   return (
@@ -81,17 +93,10 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-[var(--accent)] py-2.5 font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-60"
+        className="w-full rounded-lg bg-[var(--accent)] py-2.5 font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-60"
       >
-        {loading ? "Signing in…" : "Log in"}
+        {loading ? "Signing in…" : "Sign in"}
       </button>
-
-      <p className="text-center text-sm text-[var(--muted)]">
-        No account?{" "}
-        <Link href="/signup" className="text-[var(--accent-hover)] hover:underline">
-          Sign up
-        </Link>
-      </p>
     </form>
   );
 }

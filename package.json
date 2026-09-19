@@ -2,30 +2,40 @@
   "name": "ai-project",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "compile:contracts": "hardhat compile",
+    "deploy:certificate": "hardhat run scripts/deploy-certificate.ts --network sepolia"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.73",
     "@ai-sdk/react": "^4.0.106",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
+    "@tanstack/react-query": "^5.103.1",
     "ai": "^7.0.103",
     "next": "^15.2.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "viem": "^2.56.8",
+    "wagmi": "^3.7.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.0.0",
+    "@openzeppelin/contracts": "^5.6.1",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "dotenv": "^18.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.2.0",
+    "hardhat": "^3.17.0",
+    "pdf-lib": "^1.17.1",
     "supabase": "^2.117.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0"
