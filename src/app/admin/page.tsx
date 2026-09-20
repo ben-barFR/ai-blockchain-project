@@ -136,6 +136,14 @@ export default async function AdminIssuersPage() {
               >
                 GitHub project
               </a>
+              <a
+                href="https://dashboard.alchemy.com/apps/k8jsni4wy02jknfe/metrics"
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-[var(--accent-hover)] hover:underline"
+              >
+                Alchemy project
+              </a>
             </div>
           </div>
         </section>

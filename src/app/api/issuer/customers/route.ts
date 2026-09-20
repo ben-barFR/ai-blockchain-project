@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
   const fullName = (body.fullName || "").trim() || null;
   const email = body.email ? normalizeEmail(body.email) : null;
-  let walletAddress = body.walletAddress ? normalizeWallet(body.walletAddress) : null;
+  const walletAddress = body.walletAddress ? normalizeWallet(body.walletAddress) : null;
 
   if (walletAddress && !isWalletAddress(walletAddress)) {
     return NextResponse.json({ error: "Wallet must be a valid 0x address" }, { status: 400 });

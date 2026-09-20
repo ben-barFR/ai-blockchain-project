@@ -24,7 +24,7 @@ const DEMO_USERS = [
   },
 ] as const;
 
-export async function ensureDemoUsers() {
+async function ensureDemoUsers() {
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 200 });
   if (error) throw error;

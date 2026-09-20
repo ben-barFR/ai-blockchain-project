@@ -1,11 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createEthereumWallet } from "@/lib/ethereum/wallet";
 
-export async function ensureProfileWallet(
-  client: {
-    from: (table: string) => any;
-  },
-  userId: string,
-) {
+export async function ensureProfileWallet(client: SupabaseClient, userId: string) {
   const { data: profile } = await client
     .from("profiles")
     .select("wallet_address, generated_wallet_key, wallet_source")
