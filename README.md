@@ -203,3 +203,10 @@ npm run dev
 Or start the same server from the IDE **Run and Debug** panel (`.vscode/launch.json`): **Next.js: dev**, or **Next.js: debug full stack** to open Chrome attached for debugging once the app is ready.
 
 Demo accounts: `/demo` — “login as” for issuer / owner / admin for demos.
+
+## Vibe coding process used
+
+I have used the recommended setup with Cursor. I first started with an initial detailed description of the context with the business problem and the concepts, the UI main screens that I had in mind and the user flows I wanteds to see.
+Then I started experimenting and drilling into each main flows to refine the processes and data. I also used cusror to get info on some crypto processes, build the contract, how to deploy it.
+Finally I conluded with a code review, refactiring and manifest building.
+I mostly worked locally, but still checked that the Vercel deployment was working.
