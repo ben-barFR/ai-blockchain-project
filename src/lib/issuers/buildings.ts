@@ -1,4 +1,7 @@
+import { normalizeBuildingField } from "@/lib/certificates/building-normalize";
 import { COMPONENT_KINDS } from "@/lib/certificates/constants";
+
+export { normalizeBuildingField };
 
 export type CustomerBuilding = {
   id: string;
@@ -14,14 +17,6 @@ export type CustomerBuilding = {
 export type CustomerBuildingWithCerts = CustomerBuilding & {
   certificate_issuances?: { id: string; token_id: string | null }[];
 };
-
-export function normalizeBuildingField(value: string) {
-  return value
-    .trim()
-    .replace(/[\n\r,]+/g, " ")
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
 
 export function buildingMatchKey(input: {
   buildingIdentifier?: string | null;
@@ -66,7 +61,7 @@ export function findMatchingBuilding<T extends CustomerBuilding>(
   return active.find((building) => buildingsMatch(building, parsed)) || null;
 }
 
-export function buildingTitle(building: {
+export function issuerBuildingTitle(building: {
   building_identifier?: string | null;
   postal_address?: string | null;
 }) {

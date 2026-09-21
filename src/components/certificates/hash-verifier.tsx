@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { PdfPicker } from "@/components/certificates/pdf-picker";
 import { hashFile } from "@/lib/certificates/hash";
-import { isPdfFile, MAX_REPORT_PDF_BYTES } from "@/lib/certificates/report-file";
+import { parseReportPdf, validateReportPdf } from "@/lib/certificates/parse-report-client";
 
 type Match = {
   tokenId: string;
@@ -15,40 +16,6 @@ type Match = {
   valid: boolean;
   invalidated: boolean;
 };
-
-function PdfPicker({
-  file,
-  reading,
-  onChange,
-}: {
-  file: File | null;
-  reading: boolean;
-  onChange: (file: File | undefined) => void;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-[var(--accent)]/70 bg-[var(--accent)]/10 p-4">
-      <p className="text-sm font-medium">PDF report</p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <label className="relative inline-flex cursor-pointer items-center justify-center rounded-lg bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white hover:bg-[var(--accent-hover)]">
-          <input
-            type="file"
-            accept="application/pdf"
-            className="absolute inset-0 cursor-pointer opacity-0"
-            onChange={(event) => {
-              const next = event.target.files?.[0];
-              onChange(next);
-              event.target.value = "";
-            }}
-          />
-          {file ? "Replace PDF" : "Choose PDF report"}
-        </label>
-        <span className="text-sm text-[var(--muted)]">
-          {reading ? "Reading report…" : file ? file.name : "No file chosen"}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export function HashVerifier() {
   const [file, setFile] = useState<File | null>(null);
@@ -72,28 +39,10 @@ export function HashVerifier() {
     setAuthentic(null);
     setMatches([]);
     try {
-      const form = new FormData();
-      form.set("file", nextFile);
-      const response = await fetch("/api/certificates/parse-report", {
-        method: "POST",
-        body: form,
-      });
-      const payload = (await response.json()) as {
-        buildingId?: string;
-        postalAddress?: string;
-        countryCode?: string;
-        error?: string;
-      };
-      if (!response.ok) {
-        setBuildingId("");
-        setPostalAddress("");
-        setCountryCode("");
-        setParseError(payload.error || "Could not read this PDF");
-        return;
-      }
-      setBuildingId(payload.buildingId || "");
-      setPostalAddress(payload.postalAddress || "");
-      setCountryCode(payload.countryCode || "");
+      const parsed = await parseReportPdf(nextFile);
+      setBuildingId(parsed.buildingId);
+      setPostalAddress(parsed.postalAddress);
+      setCountryCode(parsed.countryCode);
     } catch (err) {
       setBuildingId("");
       setPostalAddress("");
@@ -117,12 +66,9 @@ export function HashVerifier() {
     setPostalAddress("");
     setCountryCode("");
     if (!nextFile) return;
-    if (!isPdfFile(nextFile)) {
-      setError("Upload a PDF report");
-      return;
-    }
-    if (nextFile.size > MAX_REPORT_PDF_BYTES) {
-      setError("PDF must be 12 MB or smaller");
+    const invalid = validateReportPdf(nextFile);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setFile(nextFile);

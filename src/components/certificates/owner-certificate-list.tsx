@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { CertificateCard } from "@/components/certificates/certificate-card";
 import { CheckAuthenticityButton } from "@/components/certificates/check-authenticity-button";
 import { useOwnedCertificates } from "@/components/certificates/use-owned-certificates";
-import { buildingKey, buildingTitle } from "@/lib/certificates/buildings";
+import { buildingKey, onChainBuildingTitle } from "@/lib/certificates/buildings";
 
 export function OwnerCertificateList({ walletAddress }: { walletAddress: string }) {
   const searchParams = useSearchParams();
@@ -19,7 +19,7 @@ export function OwnerCertificateList({ walletAddress }: { walletAddress: string 
   }, [buildingFilter, certificates]);
 
   const filterTitle = visible[0]
-    ? buildingTitle(visible[0])
+    ? onChainBuildingTitle(visible[0])
     : null;
 
   return (

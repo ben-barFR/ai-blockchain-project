@@ -6,9 +6,7 @@ import { normalizeBuildingField } from "@/lib/issuers/buildings";
 import { isContractConfigured } from "@/lib/ethereum/client";
 import {
   readCertificate,
-  readTokensByBuilding,
-  readTokensByBuildingId,
-  readTokensByPostalAddress,
+  resolveTokenIdsForBuilding,
 } from "@/lib/ethereum/certificates";
 
 export const maxDuration = 60;
@@ -37,27 +35,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    let tokenIds: bigint[] = [];
-    if (countryCode && buildingId) {
-      tokenIds = await readTokensByBuilding(countryCode, buildingId);
-    }
-    if (tokenIds.length === 0 && buildingId) {
-      tokenIds = await readTokensByBuildingId(buildingId);
-    }
-    if (tokenIds.length === 0 && postalAddress) {
-      tokenIds = await readTokensByPostalAddress(postalAddress);
-    }
+    const tokenIds = await resolveTokenIdsForBuilding({
+      countryCode,
+      buildingId,
+      postalAddress,
+    });
 
     if (tokenIds.length === 0) {
       return NextResponse.json({ found: false, authentic: false, matches: [] });
     }
 
-    const certificates = await Promise.all(tokenIds.map((tokenId) => readCertificate(tokenId)));
+    const certificates = await Promise.all(tokenIds.map((id) => readCertificate(id)));
     const wantedAddress = postalAddress ? normalizeBuildingField(postalAddress) : "";
-    const addressed = wantedAddress
-      ? certificates.filter((certificate) => normalizeBuildingField(certificate.postalAddress) === wantedAddress)
-      : [];
-    const candidates = addressed.length > 0 ? addressed : certificates;
+    const candidates = wantedAddress
+      ? certificates.filter(
+          (certificate) => normalizeBuildingField(certificate.postalAddress) === wantedAddress,
+        )
+      : certificates;
+
+    if (wantedAddress && candidates.length === 0) {
+      return NextResponse.json({ found: certificates.length > 0, authentic: false, matches: [] });
+    }
 
     const reportHash = body.reportHash.toLowerCase();
     const matches = candidates.flatMap((certificate) =>

@@ -14,7 +14,7 @@ export function buildingKey(certificate: Pick<OnChainCertificate, "countryCode" 
     .join("|");
 }
 
-export function buildingTitle(building: Pick<OwnerBuilding, "buildingId" | "postalAddress">) {
+export function onChainBuildingTitle(building: Pick<OwnerBuilding, "buildingId" | "postalAddress">) {
   return building.postalAddress || building.buildingId || "Unnamed building";
 }
 

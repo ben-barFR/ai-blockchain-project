@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-const output = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "dummy-electrical-ze15-rueil.pdf");
+const output = join(dirname(fileURLToPath(import.meta.url)), "dummy-electrical-ze15-rueil.pdf");
 
 const pdf = await PDFDocument.create();
 pdf.setTitle("Electrical Installation Certificate - ZE15 Rueil");

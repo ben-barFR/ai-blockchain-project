@@ -1,12 +1,16 @@
-import { createPublicClient, http, isAddress, type Address, type Hex } from "viem";
+import { isAddress, type Address, type Hex } from "viem";
+import { normalizeBuildingField } from "@/lib/certificates/building-normalize";
 import { COMPONENT_INDEX, COMPONENT_KINDS, type ComponentKind } from "@/lib/certificates/constants";
 import {
   getCertificateContract,
-  getChain,
   getPublicClient,
-  getRpcUrl,
   isContractConfigured,
 } from "@/lib/ethereum/client";
+
+/** Free Alchemy JSON-RPC batches of 10 are reliable. Scan getCertificateMeta instead of eth_getLogs (10-block range limit). */
+export const TOKEN_SCAN_BATCH_SIZE = BigInt(10);
+/** Sequential scan stops here if tokens still exist; raise if mint counts grow past this. */
+export const TOKEN_SCAN_MAX_ID = BigInt(1000);
 
 export type OnChainComponent = {
   kind: ComponentKind;
@@ -105,104 +109,86 @@ export async function readTokensByBuilding(countryCode: string, buildingId: stri
   });
 }
 
-function normalizeBuildingLookup(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
+async function scanTokenMetas(
+  matches: (row: { buildingId: string; postalAddress: string }) => boolean,
+) {
+  const client = getPublicClient();
+  const contract = getCertificateContract();
+  const tokenIds: bigint[] = [];
+  let start = BigInt(1);
+
+  while (start <= TOKEN_SCAN_MAX_ID) {
+    const ids = Array.from({ length: Number(TOKEN_SCAN_BATCH_SIZE) }, (_, index) => start + BigInt(index));
+    const rows = await Promise.all(
+      ids.map(async (tokenId) => {
+        try {
+          const meta = await client.readContract({
+            ...contract,
+            functionName: "getCertificateMeta",
+            args: [tokenId],
+          });
+          return { tokenId, buildingId: meta[0], postalAddress: meta[2] };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    let reachedEnd = false;
+    for (const row of rows) {
+      if (!row) {
+        reachedEnd = true;
+        break;
+      }
+      if (matches(row)) tokenIds.push(row.tokenId);
+    }
+    if (reachedEnd) break;
+    start += TOKEN_SCAN_BATCH_SIZE;
+  }
+
+  return tokenIds;
 }
 
 export async function readTokensByBuildingId(buildingId: string) {
-  const wanted = normalizeBuildingLookup(buildingId);
+  const wanted = normalizeBuildingField(buildingId);
   if (!wanted) return [];
 
   const prefix = buildingId.trim().slice(0, 2).toUpperCase();
   if (/^[A-Z]{2}$/.test(prefix)) {
     const indexed = await readTokensByBuilding(prefix, buildingId.trim());
-    if (indexed.length > 0) return indexed;
+    if (indexed.length > 0) return [...indexed];
   }
 
-  const client = getPublicClient();
-  const contract = getCertificateContract();
-  const tokenIds: bigint[] = [];
-  const batchSize = 10n;
-  let start = 1n;
-  const maxId = 1000n;
-
-  while (start <= maxId) {
-    const ids = Array.from({ length: Number(batchSize) }, (_, index) => start + BigInt(index));
-    const rows = await Promise.all(
-      ids.map(async (tokenId) => {
-        try {
-          const meta = await client.readContract({
-            ...contract,
-            functionName: "getCertificateMeta",
-            args: [tokenId],
-          });
-          return { tokenId, buildingId: meta[0] };
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    let reachedEnd = false;
-    for (const row of rows) {
-      if (!row) {
-        reachedEnd = true;
-        break;
-      }
-      if (normalizeBuildingLookup(row.buildingId) === wanted) {
-        tokenIds.push(row.tokenId);
-      }
-    }
-    if (reachedEnd) break;
-    start += batchSize;
-  }
-
-  return tokenIds;
+  return scanTokenMetas((row) => normalizeBuildingField(row.buildingId) === wanted);
 }
 
 export async function readTokensByPostalAddress(postalAddress: string) {
-  const wanted = normalizeBuildingLookup(postalAddress);
+  const wanted = normalizeBuildingField(postalAddress);
   if (!wanted) return [];
+  return scanTokenMetas((row) => normalizeBuildingField(row.postalAddress) === wanted);
+}
 
-  const client = getPublicClient();
-  const contract = getCertificateContract();
-  const tokenIds: bigint[] = [];
-  const batchSize = 10n;
-  let start = 1n;
-  const maxId = 1000n;
+export async function resolveTokenIdsForBuilding(input: {
+  countryCode?: string;
+  buildingId?: string;
+  postalAddress?: string;
+}) {
+  const countryCode = (input.countryCode || "").trim().toUpperCase();
+  const buildingId = (input.buildingId || "").trim();
+  const postalAddress = (input.postalAddress || "").trim();
 
-  while (start <= maxId) {
-    const ids = Array.from({ length: Number(batchSize) }, (_, index) => start + BigInt(index));
-    const rows = await Promise.all(
-      ids.map(async (tokenId) => {
-        try {
-          const meta = await client.readContract({
-            ...contract,
-            functionName: "getCertificateMeta",
-            args: [tokenId],
-          });
-          return { tokenId, postalAddress: meta[2] };
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    let reachedEnd = false;
-    for (const row of rows) {
-      if (!row) {
-        reachedEnd = true;
-        break;
-      }
-      if (normalizeBuildingLookup(row.postalAddress) === wanted) {
-        tokenIds.push(row.tokenId);
-      }
-    }
-    if (reachedEnd) break;
-    start += batchSize;
+  if (countryCode && buildingId) {
+    const indexed = await readTokensByBuilding(countryCode, buildingId);
+    if (indexed.length > 0) return [...indexed];
   }
-
-  return tokenIds;
+  if (buildingId) {
+    const byId = await readTokensByBuildingId(buildingId);
+    if (byId.length > 0) return byId;
+  }
+  if (postalAddress) {
+    return readTokensByPostalAddress(postalAddress);
+  }
+  return [];
 }
 
 export async function verifyOnChainHash(tokenId: bigint, kind: ComponentKind, reportHash: Hex) {
@@ -211,12 +197,5 @@ export async function verifyOnChainHash(tokenId: bigint, kind: ComponentKind, re
     ...getCertificateContract(),
     functionName: "verifyReportHash",
     args: [tokenId, COMPONENT_INDEX[kind], reportHash],
-  });
-}
-
-export function createBrowserPublicClient() {
-  return createPublicClient({
-    chain: getChain(),
-    transport: http(getRpcUrl()),
   });
 }

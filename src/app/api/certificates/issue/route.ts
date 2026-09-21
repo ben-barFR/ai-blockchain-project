@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAddress, parseEventLogs, zeroHash, type Hex } from "viem";
 import { COMPONENT_INDEX, COMPONENT_KINDS, type ComponentKind } from "@/lib/certificates/constants";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { certificateAbi } from "@/lib/ethereum/abi";
 import {
   getCertificateContract,
@@ -12,6 +10,7 @@ import {
 } from "@/lib/ethereum/client";
 import { getMinterClient } from "@/lib/ethereum/minter";
 import { isWalletAddress, normalizeWallet } from "@/lib/issuers/customers";
+import { requireApprovedIssuer } from "@/lib/issuers/current-issuer";
 
 function asHash(value: unknown): Hex {
   if (typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value)) {
@@ -28,26 +27,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
-  const { data: issuer } = await admin
-    .from("issuers")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!issuer || issuer.status !== "approved") {
-    return NextResponse.json(
-      { error: "Issuer is not approved yet" },
-      { status: 403 },
-    );
+  const { issuer, error: issuerError, status: issuerStatus, admin } = await requireApprovedIssuer();
+  if (issuerError || !issuer || !admin) {
+    return NextResponse.json({ error: issuerError || "Unauthorized" }, { status: issuerStatus });
   }
 
   const body = (await request.json()) as {
@@ -233,6 +215,10 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    await admin
+      .from("issuers")
+      .update({ issuance_credits: reserved.issuance_credits + 1 })
+      .eq("id", issuer.id);
     return NextResponse.json({ error: error.message, txHash: hash, tokenId }, { status: 500 });
   }
 

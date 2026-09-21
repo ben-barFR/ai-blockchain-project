@@ -7,8 +7,14 @@ import {
   MAX_REPORT_PDF_BYTES,
   uniqueComponentKinds,
 } from "@/lib/certificates/report-file";
+import { clientIp, rateLimitResponse, takeRateLimit } from "@/lib/http/rate-limit";
+import { getCurrentIssuer } from "@/lib/issuers/current-issuer";
 
 export const maxDuration = 60;
+
+const PARSE_WINDOW_MS = 15 * 60 * 1000;
+const PUBLIC_PARSE_LIMIT = 8;
+const ISSUER_PARSE_LIMIT = 40;
 
 const PARSE_PROMPT = `Read this building-assessment PDF and extract the fields in the schema.
 
@@ -23,6 +29,19 @@ Rules:
 export async function POST(request: Request) {
   if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
+  }
+
+  const { issuer } = await getCurrentIssuer();
+  const approvedIssuer = issuer?.status === "approved";
+  const limit = approvedIssuer ? ISSUER_PARSE_LIMIT : PUBLIC_PARSE_LIMIT;
+  const ip = clientIp(request);
+  const limited = takeRateLimit(
+    `parse-report:${approvedIssuer && issuer ? `issuer:${issuer.id}` : `ip:${ip}`}`,
+    limit,
+    PARSE_WINDOW_MS,
+  );
+  if (!limited.ok) {
+    return rateLimitResponse(limited.resetAt);
   }
 
   const form = await request.formData();

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CREDIT_PACK_SIZE } from "@/lib/issuers/credits";
+import { CREDIT_PACK_SIZE, issuanceCreditsRemaining } from "@/lib/issuers/credits";
 import { getCurrentIssuer } from "@/lib/issuers/current-issuer";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -15,7 +15,7 @@ export async function POST() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("issuers")
-    .update({ issuance_credits: (issuer.issuance_credits ?? 0) + CREDIT_PACK_SIZE })
+    .update({ issuance_credits: issuanceCreditsRemaining(issuer.issuance_credits) + CREDIT_PACK_SIZE })
     .eq("id", issuer.id)
     .select("issuance_credits")
     .single();

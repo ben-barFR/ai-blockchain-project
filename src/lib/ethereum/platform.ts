@@ -4,11 +4,8 @@ import { getPublicClient, isContractConfigured } from "@/lib/ethereum/client";
 
 export function getPlatformWalletAddress() {
   const key = process.env.CERT_MINTER_PRIVATE_KEY?.trim();
-  if (key) {
-    return privateKeyToAccount((key.startsWith("0x") ? key : `0x${key}`) as Hex).address;
-  }
-  const fallback = process.env.WALLET_ADDRESS?.trim();
-  return fallback || null;
+  if (!key) return null;
+  return privateKeyToAccount((key.startsWith("0x") ? key : `0x${key}`) as Hex).address;
 }
 
 export async function getPlatformWalletBalance(address: string) {

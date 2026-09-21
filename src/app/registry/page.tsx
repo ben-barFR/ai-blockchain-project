@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CertificateCard } from "@/components/certificates/certificate-card";
 import { isContractConfigured } from "@/lib/ethereum/client";
-import { readCertificate, readTokensByBuilding, readTokensByBuildingId, type OnChainCertificate } from "@/lib/ethereum/certificates";
+import { readCertificate, resolveTokenIdsForBuilding, type OnChainCertificate } from "@/lib/ethereum/certificates";
 
 export default async function RegistryPage({
   searchParams,
@@ -26,9 +26,10 @@ export default async function RegistryPage({
     }
   } else if (configured && buildingQuery) {
     try {
-      const tokenIds = countryQuery
-        ? await readTokensByBuilding(countryQuery, buildingQuery)
-        : await readTokensByBuildingId(buildingQuery);
+      const tokenIds = await resolveTokenIdsForBuilding({
+        countryCode: countryQuery,
+        buildingId: buildingQuery,
+      });
       certificates = await Promise.all(tokenIds.map((tokenId) => readCertificate(tokenId)));
       if (certificates.length === 0) lookupError = "No certificates for that building identifier.";
     } catch {

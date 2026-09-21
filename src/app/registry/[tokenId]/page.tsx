@@ -27,7 +27,7 @@ export default async function RegistryTokenPage({
               rel="noreferrer"
               className="text-[var(--accent-hover)] hover:underline"
             >
-              View token on Etherscan
+              View certificate on Etherscan
             </a>
           </p>
         ) : null}

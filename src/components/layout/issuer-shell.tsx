@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { IssuerNav } from "@/components/layout/issuer-nav";
+import { issuanceCreditsRemaining } from "@/lib/issuers/credits";
 import { getCurrentIssuer } from "@/lib/issuers/current-issuer";
 
 export async function IssuerShell({
@@ -11,7 +12,7 @@ export async function IssuerShell({
   email?: string | null;
 }) {
   const { issuer } = await getCurrentIssuer();
-  const credits = issuer?.issuance_credits ?? 0;
+  const credits = issuanceCreditsRemaining(issuer?.issuance_credits);
 
   return (
     <>

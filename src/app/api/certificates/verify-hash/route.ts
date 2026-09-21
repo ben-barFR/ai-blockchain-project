@@ -37,6 +37,6 @@ export async function POST(request: Request) {
       },
     });
   } catch {
-    return NextResponse.json({ error: "Token not found on-chain" }, { status: 404 });
+    return NextResponse.json({ error: "Certificate not found on-chain" }, { status: 404 });
   }
 }

@@ -2,20 +2,10 @@ import { redirect } from "next/navigation";
 import { DemoCreditCardForm } from "@/components/issuers/demo-credit-card-form";
 import { IssuerShell } from "@/components/layout/issuer-shell";
 import { CREDIT_PACK_PRICE_EUR, CREDIT_PACK_SIZE } from "@/lib/issuers/credits";
-import { createClient } from "@/lib/supabase/server";
+import { requireIssuerSession } from "@/lib/issuers/current-issuer";
 
 export default async function IssuerCreditsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/issuer");
-
-  const { data: issuer } = await supabase
-    .from("issuers")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { user, issuer } = await requireIssuerSession({ unauthenticatedHref: "/issuer" });
   if (!issuer) redirect("/issuer/company");
 
   return (

@@ -1,21 +1,10 @@
-import { redirect } from "next/navigation";
 import { CompanyPanel } from "@/components/issuers/company-panel";
 import { IssuerShell } from "@/components/layout/issuer-shell";
 import { ensureProfileWallet } from "@/lib/ethereum/profile-wallet";
-import { createClient } from "@/lib/supabase/server";
+import { requireIssuerSession } from "@/lib/issuers/current-issuer";
 
 export default async function IssuerCompanyPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/issuer");
-
-  const { data: issuer } = await supabase
-    .from("issuers")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { user, issuer, supabase } = await requireIssuerSession({ unauthenticatedHref: "/issuer" });
 
   const wallet = await ensureProfileWallet(supabase, user.id);
 

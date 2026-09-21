@@ -1,20 +1,9 @@
-import { redirect } from "next/navigation";
 import { CustomerList } from "@/components/issuers/customer-list";
 import { IssuerShell } from "@/components/layout/issuer-shell";
-import { createClient } from "@/lib/supabase/server";
+import { requireIssuerSession } from "@/lib/issuers/current-issuer";
 
 export default async function IssuerCustomersPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/issuer");
-
-  const { data: issuer } = await supabase
-    .from("issuers")
-    .select("status")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { user, issuer } = await requireIssuerSession({ unauthenticatedHref: "/issuer" });
 
   return (
     <IssuerShell email={user.email}>

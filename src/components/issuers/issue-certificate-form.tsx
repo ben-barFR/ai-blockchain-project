@@ -1,320 +1,38 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { PdfPicker } from "@/components/certificates/pdf-picker";
+import { IssueBuildingBlock } from "@/components/issuers/issue-building-block";
+import { IssueProgress, type IssueStep } from "@/components/issuers/issue-progress";
+import { IssueTypeCheckboxes } from "@/components/issuers/issue-type-checkboxes";
 import {
-  COMPONENT_EXPIRY,
-  COMPONENT_KINDS,
-  COMPONENT_LABELS,
-  type ComponentKind,
-} from "@/lib/certificates/constants";
-import { hashFile } from "@/lib/certificates/hash";
-import { isPdfFile, MAX_REPORT_PDF_BYTES, uniqueComponentKinds } from "@/lib/certificates/report-file";
+  UnexpectedPdfError,
+  type PendingPdfUpload,
+} from "@/components/issuers/unexpected-pdf-error";
 import type { CustomerRecord } from "@/components/issuers/customer-form";
+import { type ComponentKind } from "@/lib/certificates/constants";
+import { hashFile } from "@/lib/certificates/hash";
+import { parseReportPdf, validateReportPdf } from "@/lib/certificates/parse-report-client";
+import { uniqueComponentKinds } from "@/lib/certificates/report-file";
 import {
   findMatchingBuilding,
   type CustomerBuilding,
 } from "@/lib/issuers/buildings";
+import {
+  clearIssueDraft,
+  pageWasReloaded,
+  readIssueDraft,
+  readIssueFile,
+  saveIssueFile,
+  writeIssueDraft,
+  type IssueParsedReport,
+} from "@/lib/issuers/issue-draft";
 
-type ParsedReport = {
-  buildingId: string;
-  postalAddress: string;
-  countryCode: string;
-  types: ComponentKind[];
-};
-
-const ISSUE_DRAFT_KEY = "bldcrt-issue-draft";
-const ISSUE_FILE_DB = "bldcrt-issue";
-const ISSUE_FILE_STORE = "files";
-const ISSUE_FILE_KEY = "pdf";
-
-let issueFileMemory: File | null = null;
-
-function pageWasReloaded() {
-  if (typeof performance === "undefined") return false;
-  const [nav] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
-  return nav?.type === "reload";
-}
-
-function readIssueDraft() {
-  try {
-    const raw = sessionStorage.getItem(ISSUE_DRAFT_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as {
-      customerId?: string;
-      parsed?: ParsedReport;
-      types?: ComponentKind[];
-      selectedBuildingId?: string;
-      parseError?: string;
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeIssueDraft(draft: {
-  customerId: string;
-  parsed?: ParsedReport;
-  types: ComponentKind[];
-  selectedBuildingId?: string;
-  parseError?: string;
-}) {
-  try {
-    sessionStorage.setItem(ISSUE_DRAFT_KEY, JSON.stringify(draft));
-  } catch {
-    /* ignore quota */
-  }
-}
-
-function openIssueFileDb() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(ISSUE_FILE_DB, 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(ISSUE_FILE_STORE)) {
-        request.result.createObjectStore(ISSUE_FILE_STORE);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function saveIssueFile(file: File) {
-  issueFileMemory = file;
-  try {
-    const db = await openIssueFileDb();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(ISSUE_FILE_STORE, "readwrite");
-      tx.objectStore(ISSUE_FILE_STORE).put(file, ISSUE_FILE_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
-  } catch {
-    /* Keep the in-memory copy if IndexedDB is unavailable. */
-  }
-}
-
-async function readIssueFile() {
-  if (issueFileMemory) return issueFileMemory;
-  try {
-    const db = await openIssueFileDb();
-    const file = await new Promise<File | null>((resolve, reject) => {
-      const tx = db.transaction(ISSUE_FILE_STORE, "readonly");
-      const request = tx.objectStore(ISSUE_FILE_STORE).get(ISSUE_FILE_KEY);
-      request.onsuccess = () => resolve((request.result as File) || null);
-      request.onerror = () => reject(request.error);
-    });
-    db.close();
-    issueFileMemory = file;
-    return file;
-  } catch {
-    return null;
-  }
-}
-
-function clearIssueDraft() {
-  issueFileMemory = null;
-  try {
-    sessionStorage.removeItem(ISSUE_DRAFT_KEY);
-  } catch {
-    /* ignore */
-  }
-  void openIssueFileDb()
-    .then(async (db) => {
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(ISSUE_FILE_STORE, "readwrite");
-        tx.objectStore(ISSUE_FILE_STORE).delete(ISSUE_FILE_KEY);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-      db.close();
-    })
-    .catch(() => {
-      /* ignore */
-    });
-}
-
-type IssueStep = "issue" | "transfer" | "upload";
-
-const ISSUE_STEPS: { id: IssueStep; label: string }[] = [
-  { id: "issue", label: "Issuing certificate" },
-  { id: "transfer", label: "Transferring to the client" },
-  { id: "upload", label: "Uploading PDF" },
-];
-
-type PendingPdfUpload = {
-  tokenId: string;
-  issuanceId: string;
-  contentHash: string;
-  types: ComponentKind[];
-  file: File;
-  customerId: string;
-  buildingId: string;
-};
+type ParsedReport = IssueParsedReport;
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function buildingOptionLabel(building: CustomerBuilding) {
-  const identifier = building.building_identifier?.trim() || "No ID";
-  const address = building.postal_address?.replace(/[\s\n]+/g, " ").trim() || "No address";
-  return `${identifier} · ${address}`;
-}
-
-function supportMailto(supportEmail: string, supabaseError: string, pending: PendingPdfUpload | null) {
-  const body = [
-    "The PDF could not be stored after the certificate was issued.",
-    "",
-    `Supabase error: ${supabaseError}`,
-    pending?.tokenId ? `Certificate ID: ${pending.tokenId}` : null,
-    pending?.issuanceId ? `Issuance ID: ${pending.issuanceId}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-  return `mailto:${supportEmail}?subject=${encodeURIComponent("Unexpected PDF upload error")}&body=${encodeURIComponent(body)}`;
-}
-
-function IssueProgress({
-  current,
-  failed,
-}: {
-  current: IssueStep | null;
-  failed: IssueStep | null;
-}) {
-  const currentIndex = current ? ISSUE_STEPS.findIndex((step) => step.id === current) : -1;
-  const failedIndex = failed ? ISSUE_STEPS.findIndex((step) => step.id === failed) : -1;
-  const fillPercent = failed
-    ? Math.round(((failedIndex + 1) / ISSUE_STEPS.length) * 100)
-    : currentIndex < 0
-      ? 0
-      : Math.round(((currentIndex + 0.55) / ISSUE_STEPS.length) * 100);
-
-  return (
-    <div className="space-y-3">
-      <div
-        className="h-2 overflow-hidden rounded-full bg-[var(--border)]"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.min(fillPercent, 100)}
-        aria-label="Issuance progress"
-      >
-        <div
-          className={`h-full rounded-full transition-all ${failed ? "bg-red-400" : "bg-[var(--accent)]"}`}
-          style={{ width: `${Math.min(Math.max(fillPercent, 8), 100)}%` }}
-        />
-      </div>
-      <ol className="space-y-1.5 text-sm">
-        {ISSUE_STEPS.map((step, index) => {
-          let status: "done" | "current" | "error" | "pending" = "pending";
-          if (failed && index === failedIndex) status = "error";
-          else if (failed && index < failedIndex) status = "done";
-          else if (currentIndex >= 0 && index < currentIndex) status = "done";
-          else if (index === currentIndex && !failed) status = "current";
-
-          const color =
-            status === "error"
-              ? "text-red-300"
-              : status === "current"
-                ? "text-[var(--foreground)]"
-                : status === "done"
-                  ? "text-[var(--muted)]"
-                  : "text-[var(--muted)]";
-
-          return (
-            <li key={step.id} className={`flex items-center gap-2 ${color}`}>
-              <span className="w-4 text-center text-xs">
-                {status === "done" ? "✓" : status === "error" ? "!" : status === "current" ? "●" : "○"}
-              </span>
-              <span className={status === "current" ? "font-medium" : undefined}>{step.label}</span>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
-
-function UnexpectedPdfError({
-  supabaseError,
-  supportEmail,
-  pending,
-  onRetry,
-}: {
-  supabaseError: string;
-  supportEmail: string;
-  pending: PendingPdfUpload | null;
-  onRetry: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  async function copyError() {
-    try {
-      await navigator.clipboard.writeText(supabaseError);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  return (
-    <div className="space-y-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm">
-      <p className="text-red-200">
-        The PDF could not be stored after the certificate was issued. This is not expected.
-      </p>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[var(--background)] p-3 text-xs text-red-200">
-        {supabaseError}
-      </pre>
-      <div className="flex flex-wrap gap-x-4 gap-y-2">
-        <a href={supportMailto(supportEmail, supabaseError, pending)} className="text-[var(--accent-hover)] hover:underline">
-          Contact support
-        </a>
-        <button type="button" onClick={() => void copyError()} className="text-[var(--accent-hover)] hover:underline">
-          {copied ? "Error copied" : "Copy error message"}
-        </button>
-        <button type="button" onClick={onRetry} className="text-[var(--accent-hover)] hover:underline">
-          Retry
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PdfPicker({
-  file,
-  reading,
-  onChange,
-}: {
-  file: File | null;
-  reading: boolean;
-  onChange: (file: File | undefined) => void;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-[var(--accent)]/70 bg-[var(--accent)]/10 p-4">
-      <p className="text-sm font-medium">PDF report</p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <label className="relative inline-flex cursor-pointer items-center justify-center rounded-lg bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white hover:bg-[var(--accent-hover)]">
-          <input
-            type="file"
-            accept="application/pdf"
-            className="absolute inset-0 cursor-pointer opacity-0"
-            onChange={(event) => {
-              const next = event.target.files?.[0];
-              onChange(next);
-              event.target.value = "";
-            }}
-          />
-          {file ? "Replace PDF" : "Choose PDF report"}
-        </label>
-        <span className="text-sm text-[var(--muted)]">
-          {reading ? "Reading report…" : file ? file.name : "No file chosen"}
-        </span>
-      </div>
-    </div>
-  );
 }
 
 export function IssueCertificateForm({
@@ -493,22 +211,7 @@ export function IssueCertificateForm({
     setParseError(null);
     setResult(null);
     try {
-      const form = new FormData();
-      form.set("file", nextFile);
-      const response = await fetch("/api/certificates/parse-report", {
-        method: "POST",
-        body: form,
-      });
-      const payload = (await response.json()) as ParsedReport & { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error || "Could not read this PDF");
-      }
-      const nextParsed: ParsedReport = {
-        buildingId: payload.buildingId || "",
-        postalAddress: payload.postalAddress || "",
-        countryCode: payload.countryCode || "FR",
-        types: uniqueComponentKinds(payload.types),
-      };
+      const nextParsed = await parseReportPdf(nextFile);
       setParsed(nextParsed);
       setParseError(null);
       setTypes(nextParsed.types);
@@ -549,12 +252,9 @@ export function IssueCertificateForm({
     setError(null);
     setResult(null);
     if (!nextFile) return;
-    if (!isPdfFile(nextFile)) {
-      setError("Upload a PDF report");
-      return;
-    }
-    if (nextFile.size > MAX_REPORT_PDF_BYTES) {
-      setError("PDF must be 12 MB or smaller");
+    const invalid = validateReportPdf(nextFile);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setFile(nextFile);
@@ -824,119 +524,31 @@ export function IssueCertificateForm({
       ) : null}
 
       {showAfterPdf ? (
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-medium">Certificate types in this document</legend>
-          <p className="text-xs text-[var(--muted)]">
-            This PDF can cover one, two, or all three types. The same file is hashed once and written
-            on the certificate.
-          </p>
-          {COMPONENT_KINDS.map((kind) => (
-            <label
-              key={kind}
-              className="flex items-center gap-2 rounded-xl border border-[var(--border)] p-3 text-sm"
-            >
-              <input
-                type="checkbox"
-                checked={types.includes(kind)}
-                onChange={() => toggleType(kind)}
-                disabled={reading}
-              />
-              <span>{COMPONENT_LABELS[kind]}</span>
-              <span className="text-[var(--muted)]">· {COMPONENT_EXPIRY[kind]}</span>
-            </label>
-          ))}
-        </fieldset>
+        <IssueTypeCheckboxes types={types} disabled={reading} onToggle={toggleType} />
       ) : null}
 
       {showAfterPdf ? (
-        <div className="space-y-3 rounded-xl border border-[var(--border)] p-4 text-sm">
-          {changingBuilding || (!selectedBuilding && !parsed) ? (
-            <>
-              <p className="font-medium">Building</p>
-              <select
-                value={pickerBuildingId}
-                onChange={(event) => setPickerBuildingId(event.target.value)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2"
-              >
-                <option value="">Select a building</option>
-                {activeBuildings.map((building) => (
-                  <option key={building.id} value={building.id}>
-                    {buildingOptionLabel(building)}
-                  </option>
-                ))}
-              </select>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={!pickerBuildingId}
-                  onClick={() => {
-                    setManualBuildingId(pickerBuildingId);
-                    setSelectedBuildingId(pickerBuildingId);
-                    setChangingBuilding(false);
-                  }}
-                  className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-60"
-                >
-                  Select
-                </button>
-                <Link
-                  href={newBuildingHref({ empty: true })}
-                  onClick={() => {
-                    void persistDraft();
-                  }}
-                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--background)]"
-                >
-                  Add new building
-                </Link>
-              </div>
-            </>
-          ) : selectedBuilding ? (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <p className="font-medium">Selected building</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPickerBuildingId(selectedBuildingId);
-                    setChangingBuilding(true);
-                  }}
-                  className="shrink-0 text-sm text-[var(--accent-hover)] hover:underline"
-                >
-                  Change building
-                </button>
-              </div>
-              <p>
-                <span className="text-[var(--muted)]">Building ID:</span>{" "}
-                {selectedBuilding.building_identifier || "—"}
-              </p>
-              <p className="whitespace-pre-line">
-                <span className="text-[var(--muted)]">Address:</span>{" "}
-                {selectedBuilding.postal_address || "—"}
-                {selectedBuilding.country_code ? ` (${selectedBuilding.country_code})` : ""}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-medium">Building</p>
-              <p className="text-[var(--muted)]">No existing building matches this PDF.</p>
-              <p>
-                <span className="text-[var(--muted)]">Building ID:</span> {parsed?.buildingId || "—"}
-              </p>
-              <p className="whitespace-pre-line">
-                <span className="text-[var(--muted)]">Address:</span> {parsed?.postalAddress || "—"}
-                {parsed?.countryCode ? ` (${parsed.countryCode})` : ""}
-              </p>
-              <Link
-                href={newBuildingHref()}
-                onClick={() => {
-                  void persistDraft();
-                }}
-                className="inline-block text-sm text-[var(--accent-hover)] hover:underline"
-              >
-                Create a new building with this PDF data
-              </Link>
-            </>
-          )}
-        </div>
+        <IssueBuildingBlock
+          selectedBuilding={selectedBuilding}
+          parsed={parsed}
+          changingBuilding={changingBuilding}
+          pickerBuildingId={pickerBuildingId}
+          activeBuildings={activeBuildings}
+          newBuildingHref={newBuildingHref}
+          onPickerChange={setPickerBuildingId}
+          onSelect={() => {
+            setManualBuildingId(pickerBuildingId);
+            setSelectedBuildingId(pickerBuildingId);
+            setChangingBuilding(false);
+          }}
+          onStartChange={() => {
+            setPickerBuildingId(selectedBuildingId);
+            setChangingBuilding(true);
+          }}
+          onPersistDraft={() => {
+            void persistDraft();
+          }}
+        />
       ) : customerId && !file && !reading ? (
         <p className="text-sm text-[var(--muted)]">
           Upload a PDF to match or create a building for this customer.

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DEFAULT_ISSUANCE_CREDITS } from "@/lib/issuers/credits";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
         review_notes: "Auto-approved",
         reviewed_at: new Date().toISOString(),
         onchain_approved: onchainApproved,
-        issuance_credits: existing?.issuance_credits ?? 100,
+        issuance_credits: existing?.issuance_credits ?? DEFAULT_ISSUANCE_CREDITS,
       },
       { onConflict: "user_id" },
     )

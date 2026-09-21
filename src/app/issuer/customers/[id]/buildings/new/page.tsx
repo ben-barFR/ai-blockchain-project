@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { BuildingCreateForm } from "@/components/issuers/building-create-form";
 import { IssuerShell } from "@/components/layout/issuer-shell";
+import { requireIssuerSession } from "@/lib/issuers/current-issuer";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function NewCustomerBuildingPage({
   params,
@@ -19,18 +19,12 @@ export default async function NewCustomerBuildingPage({
 }) {
   const { id } = await params;
   const query = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/issuer");
-
-  const { data: issuer } = await supabase
-    .from("issuers")
-    .select("id, status")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!issuer || issuer.status !== "approved") redirect("/issuer/customers");
+  const { user, issuer } = await requireIssuerSession({
+    approved: true,
+    unauthenticatedHref: "/issuer",
+    unapprovedHref: "/issuer/customers",
+  });
+  if (!issuer) redirect("/issuer/customers");
 
   const admin = createAdminClient();
   const { data: customer } = await admin

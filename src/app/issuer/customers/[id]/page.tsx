@@ -3,9 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { CustomerDetailsForm } from "@/components/issuers/customer-details-form";
 import { IssuerShell } from "@/components/layout/issuer-shell";
 import { explorerAddressUrl } from "@/lib/ethereum/explorer";
-import { buildingTitle, type CustomerBuildingWithCerts } from "@/lib/issuers/buildings";
+import { issuerBuildingTitle, type CustomerBuildingWithCerts } from "@/lib/issuers/buildings";
+import { requireIssuerSession } from "@/lib/issuers/current-issuer";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 function BuildingCard({
   customerId,
@@ -22,7 +22,7 @@ function BuildingCard({
         <div>
           <p className="font-medium">
             <Link href={href} className="hover:underline">
-              {buildingTitle(building)}
+              {issuerBuildingTitle(building)}
             </Link>
           </p>
           <p className="mt-1 text-sm text-[var(--muted)]">
@@ -53,18 +53,12 @@ export default async function IssuerCustomerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/issuer");
-
-  const { data: issuer } = await supabase
-    .from("issuers")
-    .select("id, status")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!issuer || issuer.status !== "approved") redirect("/issuer/customers");
+  const { user, issuer } = await requireIssuerSession({
+    approved: true,
+    unauthenticatedHref: "/issuer",
+    unapprovedHref: "/issuer/customers",
+  });
+  if (!issuer) redirect("/issuer/customers");
 
   const admin = createAdminClient();
   const { data: customer } = await admin

@@ -4,9 +4,9 @@ import { ArchiveBuildingButton } from "@/components/issuers/archive-building-but
 import { IssuerShell } from "@/components/layout/issuer-shell";
 import { COMPONENT_LABELS } from "@/lib/certificates/constants";
 import { explorerTxUrl } from "@/lib/ethereum/explorer";
-import { buildingTitle, issuanceTypeLabels } from "@/lib/issuers/buildings";
+import { issuerBuildingTitle, issuanceTypeLabels } from "@/lib/issuers/buildings";
+import { requireIssuerSession } from "@/lib/issuers/current-issuer";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function CustomerBuildingPage({
   params,
@@ -14,18 +14,12 @@ export default async function CustomerBuildingPage({
   params: Promise<{ id: string; buildingId: string }>;
 }) {
   const { id, buildingId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/issuer");
-
-  const { data: issuer } = await supabase
-    .from("issuers")
-    .select("id, status")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!issuer || issuer.status !== "approved") redirect("/issuer/customers");
+  const { user, issuer } = await requireIssuerSession({
+    approved: true,
+    unauthenticatedHref: "/issuer",
+    unapprovedHref: "/issuer/customers",
+  });
+  if (!issuer) redirect("/issuer/customers");
 
   const admin = createAdminClient();
   const { data: customer } = await admin
@@ -56,7 +50,7 @@ export default async function CustomerBuildingPage({
     .order("created_at", { ascending: false });
 
   const name = customer.full_name || customer.email || "Customer";
-  const title = buildingTitle(building);
+  const title = issuerBuildingTitle(building);
 
   return (
     <IssuerShell email={user.email}>

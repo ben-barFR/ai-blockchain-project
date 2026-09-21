@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useOwnedCertificates } from "@/components/certificates/use-owned-certificates";
-import { buildingTitle, groupCertificatesByBuilding } from "@/lib/certificates/buildings";
+import { onChainBuildingTitle, groupCertificatesByBuilding } from "@/lib/certificates/buildings";
 
 export function OwnerBuildingList({ walletAddress }: { walletAddress: string }) {
   const { certificates, error, loading } = useOwnedCertificates(walletAddress);
@@ -22,7 +22,7 @@ export function OwnerBuildingList({ walletAddress }: { walletAddress: string }) 
           key={building.key}
           className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6"
         >
-          <h2 className="text-xl font-semibold">{buildingTitle(building)}</h2>
+          <h2 className="text-xl font-semibold">{onChainBuildingTitle(building)}</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
             {[building.countryCode, building.buildingId].filter(Boolean).join(" · ") || "No cadastral id"}
           </p>
