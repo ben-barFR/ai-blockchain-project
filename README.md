@@ -109,11 +109,13 @@ PDF download uses signed URLs, only for the token holder or the issuing company.
 
 ### Issue
 
-1. Approved issuer uploads a PDF.
-2. Gemini fills the form (`parse-report`).
-3. The browser computes `keccak256` of the file.
-4. `POST /api/certificates/issue` decrements a credit, checks `approvedIssuers`, calls `issueCertificate`, waits for `CertificateIssued`, and writes `certificate_issuances`.
-5. The NFT lands on the customer wallet. The PDF is stored in Supabase; the hash is locked on-chain.
+1. Issuer creates a customer record and send a onaboarding email.
+2. Customer registers (which creates a wallet, or link an existing one)
+3. Approved issuer uploads a PDF.
+4. Gemini fills the form (`parse-report`) with the required identifier and postal address
+5. The browser computes `keccak256` of the file.
+6. `POST /api/certificates/issue` decrements a credit, checks `approvedIssuers`, calls `issueCertificate`, waits for `CertificateIssued`, and writes `certificate_issuances`.
+6. The NFT lands on the customer wallet. The PDF is stored in Supabase; the hash is locked on-chain.
 
 ### Verify
 
@@ -157,14 +159,22 @@ Fill `.env.local` with Supabase keys, `GEMINI_API_KEY`, `CERT_MINTER_PRIVATE_KEY
 | `NEXT_PUBLIC_RPC_URL` | `https://eth-sepolia.g.alchemy.com/v2/alch_LPS4LfWzFEpXaPlnf9Bfu` |
 | `SEPOLIA_RPC_URL` | `https://eth-sepolia.g.alchemy.com/v2/alch_LPS4LfWzFEpXaPlnf9Bfu` |
 | `NEXT_PUBLIC_CERTIFICATE_CONTRACT` | [`0x9a7D18F33527935BA1130aE61298329d29E46CCB`](https://sepolia.etherscan.io/address/0x9a7D18F33527935BA1130aE61298329d29E46CCB) |
+| `DATABASE_URL` | Postgres URI (optional; for schema bootstrap) |
+
+On a **new** Supabase project, create tables / RLS / storage and seed admins:
 
 ```bash
-# 2 lines below only required if redeploying the contract on a new testnet
+npm run init:supabase
+```
+
+That applies `supabase/init_schema.sql`, then creates each `ADMIN_EMAILS` Auth user with password `ChangeMe123!` and `user_type: admin`. Use `--admins-only` to skip DDL. Issuer/owner demo accounts still come from `/demo`.
+
+```bash
+# Only required if redeploying the contract on a new chain / as a new owner
 npm run compile:contracts
-npm run deploy:certificate   # writes the contract address for Sepolia
-#
+npm run deploy:certificate
 
 npm run dev
 ```
 
-Demo accounts: `/demo`. Lets "login as" for each user for Demo purposes
+Demo accounts: `/demo` — “login as” for issuer / owner / admin for demos.

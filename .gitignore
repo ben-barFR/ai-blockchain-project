@@ -37,6 +37,9 @@ yarn-error.log*
 /cache
 /typechain-types
 
+# supabase CLI
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

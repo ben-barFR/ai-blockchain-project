@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "compile:contracts": "hardhat compile",
-    "deploy:certificate": "hardhat run scripts/deploy-certificate.ts --network sepolia"
+    "deploy:certificate": "hardhat run scripts/deploy-certificate.ts --network sepolia",
+    "init:supabase": "hardhat run --no-compile scripts/init-supabase.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.73",
