@@ -21,7 +21,7 @@ import {
 } from "@/lib/issuers/buildings";
 import {
   clearIssueDraft,
-  pageWasReloaded,
+  consumeIssuePageReload,
   readIssueDraft,
   readIssueFile,
   saveIssueFile,
@@ -71,7 +71,7 @@ export function IssueCertificateForm({
   const [pendingUpload, setPendingUpload] = useState<PendingPdfUpload | null>(null);
 
   useEffect(() => {
-    if (pageWasReloaded()) {
+    if (consumeIssuePageReload()) {
       clearIssueDraft();
       setCustomerId("");
       setSelectedBuildingId("");
@@ -93,23 +93,34 @@ export function IssueCertificateForm({
         router.replace("/issuer/issue");
       }
     } else {
+      if (presetCustomer) setCustomerId(presetCustomer);
+      if (presetBuilding) {
+        setSelectedBuildingId(presetBuilding);
+        setManualBuildingId(presetBuilding);
+        setPickerBuildingId(presetBuilding);
+      }
       const draft = readIssueDraft();
-      void readIssueFile().then((savedFile) => {
-        if (!savedFile || (!draft?.parsed && !draft?.parseError)) return;
-        setFile(savedFile);
-        if (draft.parseError) {
-          setParseError(draft.parseError);
-          setParsed(null);
-          setTypes(uniqueComponentKinds(draft.types || []));
-        } else if (draft.parsed) {
-          setParsed(draft.parsed);
-          setTypes(uniqueComponentKinds(draft.types || draft.parsed.types));
-        }
-        if (draft.customerId && !presetCustomer) setCustomerId(draft.customerId);
-        if (draft.selectedBuildingId && !presetBuilding) {
-          setManualBuildingId(draft.selectedBuildingId);
-        }
-      });
+      if (!draft) {
+        // Drop any orphaned PDF left after a successful issuance.
+        clearIssueDraft();
+      } else {
+        void readIssueFile().then((savedFile) => {
+          if (!savedFile || (!draft.parsed && !draft.parseError)) return;
+          setFile(savedFile);
+          if (draft.parseError) {
+            setParseError(draft.parseError);
+            setParsed(null);
+            setTypes(uniqueComponentKinds(draft.types || []));
+          } else if (draft.parsed) {
+            setParsed(draft.parsed);
+            setTypes(uniqueComponentKinds(draft.types || draft.parsed.types));
+          }
+          if (draft.customerId && !presetCustomer) setCustomerId(draft.customerId);
+          if (draft.selectedBuildingId && !presetBuilding) {
+            setManualBuildingId(draft.selectedBuildingId);
+          }
+        });
+      }
     }
     fetch("/api/issuer/customers")
       .then(async (response) => {
@@ -132,6 +143,24 @@ export function IssueCertificateForm({
     setFailedStep(null);
     setSupabaseError(null);
     setPendingUpload(null);
+  }
+
+  function resetIssuanceForm() {
+    resetReport();
+    setCustomerId("");
+    setSelectedBuildingId("");
+    setManualBuildingId("");
+    setChangingBuilding(false);
+    setPickerBuildingId("");
+    setBuildings([]);
+    setReading(false);
+    setLoading(false);
+  }
+
+  function finishIssuance(pending: PendingPdfUpload) {
+    clearIssueDraft();
+    resetIssuanceForm();
+    router.push(`/issuer/customers/${pending.customerId}`);
   }
 
   useEffect(() => {
@@ -303,12 +332,6 @@ export function IssueCertificateForm({
       }
     }
     return { ok: true as const };
-  }
-
-  function finishIssuance(pending: PendingPdfUpload) {
-    clearIssueDraft();
-    router.push(`/issuer/customers/${pending.customerId}/buildings/${pending.buildingId}`);
-    router.refresh();
   }
 
   async function retryPdfUpload() {

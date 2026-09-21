@@ -12,7 +12,8 @@ export default async function IssuerCompanyPage() {
     <IssuerShell email={user.email}>
       <h1 className="text-3xl font-semibold">Company</h1>
       <p className="mt-2 text-[var(--muted)]">
-        Company details used on certificates you issue. You can edit them at any time.
+        Company details used on certificates you issue. Name, website, and accreditation can be
+        updated anytime; country and official company identifier stay fixed after registration.
       </p>
 
       <section className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">

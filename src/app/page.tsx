@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AskBldcrtChat } from "@/components/chat/ask-bldcrt";
 import { createClient } from "@/lib/supabase/server";
 import { SiteHeader } from "@/components/layout/site-header";
 
@@ -51,6 +52,7 @@ export default async function Home() {
           </div>
         </section>
       </main>
+      <AskBldcrtChat />
     </>
   );
 }

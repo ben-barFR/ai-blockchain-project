@@ -44,6 +44,7 @@ export function CompanyPanel({
         <IssuerRegisterForm
           defaults={issuer || undefined}
           profileWallet={profileWallet}
+          lockIdentity={Boolean(issuer)}
           submitLabel={issuer ? "Save company details" : "Save and continue"}
           onSaved={() => {
             setEditing(false);

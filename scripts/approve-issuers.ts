@@ -1,7 +1,7 @@
 import { config as loadEnv } from "dotenv";
 import { createPublicClient, createWalletClient, http, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains";
+import { sepolia } from "../src/lib/ethereum/chains";
 
 loadEnv({ path: ".env.local" });
 

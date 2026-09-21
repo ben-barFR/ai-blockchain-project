@@ -28,8 +28,6 @@ export async function POST(request: Request) {
   };
 
   const companyName = (body.companyName || "").trim();
-  const countryCode = (body.countryCode || "").trim().toUpperCase();
-  const companyIdentifier = (body.companyIdentifier || "").trim();
   const accreditationNumber = (body.accreditationNumber || body.accreditationUrl || "").trim();
   if (accreditationNumber && !/^[0-9]+$/.test(accreditationNumber)) {
     return NextResponse.json({ error: "Accreditation number must be digits only" }, { status: 400 });
@@ -41,6 +39,28 @@ export async function POST(request: Request) {
     .eq("id", user.id)
     .maybeSingle();
   const walletAddress = (profile?.wallet_address || "").trim();
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("issuers")
+    .select("issuance_credits, country_code, company_identifier")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  // Country + official identifier map the company to the wallet on certificates;
+  // once registered they cannot be changed from the client.
+  const countryCode = (
+    existing?.country_code ||
+    body.countryCode ||
+    ""
+  )
+    .trim()
+    .toUpperCase();
+  const companyIdentifier = (
+    existing?.company_identifier ||
+    body.companyIdentifier ||
+    ""
+  ).trim();
 
   if (!companyName || !countryCode || !companyIdentifier || !walletAddress) {
     return NextResponse.json({ error: "Missing required issuer fields or account wallet" }, { status: 400 });
@@ -65,13 +85,6 @@ export async function POST(request: Request) {
       onchainApproved = false;
     }
   }
-
-  const admin = createAdminClient();
-  const { data: existing } = await admin
-    .from("issuers")
-    .select("issuance_credits")
-    .eq("user_id", user.id)
-    .maybeSingle();
 
   const { data, error } = await admin
     .from("issuers")

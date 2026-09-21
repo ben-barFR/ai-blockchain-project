@@ -6,6 +6,7 @@ export function IssuerRegisterForm({
   defaults,
   profileWallet,
   submitLabel = "Save company details",
+  lockIdentity = false,
   onSaved,
 }: {
   defaults?: {
@@ -17,6 +18,8 @@ export function IssuerRegisterForm({
   };
   profileWallet?: string;
   submitLabel?: string;
+  /** When true, country code and company identifier cannot be changed (already mapped to the wallet). */
+  lockIdentity?: boolean;
   onSaved?: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +62,12 @@ export function IssuerRegisterForm({
         name="countryCode"
         defaultValue={defaults?.country_code || "FR"}
         required
+        readOnly={lockIdentity}
+        hint={
+          lockIdentity
+            ? "Locked after registration — it identifies this company with the wallet on certificates."
+            : undefined
+        }
       />
       <Field
         label="Official company identifier"
@@ -66,6 +75,12 @@ export function IssuerRegisterForm({
         placeholder="SIREN, Companies House number, ..."
         defaultValue={defaults?.company_identifier}
         required
+        readOnly={lockIdentity}
+        hint={
+          lockIdentity
+            ? "Locked after registration — it identifies this company with the wallet on certificates."
+            : undefined
+        }
       />
       <Field
         label="Company website"
@@ -113,6 +128,8 @@ function Field({
   required,
   inputMode,
   pattern,
+  readOnly,
+  hint,
 }: {
   label: string;
   name: string;
@@ -122,6 +139,8 @@ function Field({
   required?: boolean;
   inputMode?: "numeric";
   pattern?: string;
+  readOnly?: boolean;
+  hint?: string;
 }) {
   return (
     <div>
@@ -137,8 +156,15 @@ function Field({
         placeholder={placeholder}
         inputMode={inputMode}
         pattern={pattern}
-        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+        readOnly={readOnly}
+        aria-readonly={readOnly || undefined}
+        className={
+          readOnly
+            ? "w-full cursor-default rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm text-[var(--muted)] outline-none"
+            : "w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+        }
       />
+      {hint ? <p className="mt-1.5 text-xs text-[var(--muted)]">{hint}</p> : null}
     </div>
   );
 }

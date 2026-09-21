@@ -1,5 +1,5 @@
 import { createPublicClient, http, type Address, type Chain } from "viem";
-import { hardhat, sepolia } from "viem/chains";
+import { hardhat, sepolia } from "@/lib/ethereum/chains";
 import { certificateAbi } from "@/lib/ethereum/abi";
 import { getChainId } from "@/lib/ethereum/chain-id";
 

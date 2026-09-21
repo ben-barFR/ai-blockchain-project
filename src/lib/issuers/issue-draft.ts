@@ -22,10 +22,29 @@ const ISSUE_FILE_KEY = "pdf";
 
 let issueFileMemory: File | null = null;
 
+let handledIssuePageReload = false;
+
 export function pageWasReloaded() {
-  if (typeof performance === "undefined") return false;
+  if (typeof window === "undefined" || typeof performance === "undefined") return false;
   const [nav] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
-  return nav?.type === "reload";
+  if (nav?.type !== "reload") return false;
+  // Navigation timing is for the whole document load. Only treat this as an
+  // issue-page reload when that load itself was /issuer/issue — otherwise a
+  // refresh elsewhere (e.g. customers) would wipe ?customer= on soft navigate.
+  try {
+    const loadedPath = new URL(nav.name, window.location.origin).pathname;
+    return loadedPath === "/issuer/issue" || loadedPath.startsWith("/issuer/issue/");
+  } catch {
+    return false;
+  }
+}
+
+/** True once per document load when /issuer/issue was hard-reloaded. */
+export function consumeIssuePageReload() {
+  if (handledIssuePageReload) return false;
+  if (!pageWasReloaded()) return false;
+  handledIssuePageReload = true;
+  return true;
 }
 
 export function readIssueDraft(): IssueDraft | null {
