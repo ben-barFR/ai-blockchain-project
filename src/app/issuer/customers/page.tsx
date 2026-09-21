@@ -20,7 +20,7 @@ export default async function IssuerCustomersPage() {
     <IssuerShell email={user.email}>
       <h1 className="text-3xl font-semibold">My customers</h1>
       <p className="mt-2 text-[var(--muted)]">
-        People you send certificates to. Each record keeps the destination wallet.
+        People you send certificates to. Each customer can have several buildings.
       </p>
       {issuer?.status !== "approved" ? (
         <p className="mt-8 text-sm text-amber-300">

@@ -21,7 +21,7 @@ async function issuerClient(issuerId: string) {
   return admin
     .from("issuer_customers")
     .select(
-      "id, issuer_id, full_name, email, wallet_address, user_id, onboard_sent_at, onboard_claimed_at, created_at, certificate_issuances(id, token_id)",
+      "id, issuer_id, full_name, email, wallet_address, user_id, onboard_sent_at, onboard_claimed_at, created_at, customer_buildings(id, archived_at), certificate_issuances(id)",
     )
     .eq("issuer_id", issuerId)
     .order("created_at", { ascending: false });

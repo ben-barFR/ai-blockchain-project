@@ -52,9 +52,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     customerId?: string;
-    buildingId?: string;
-    countryCode?: string;
-    postalAddress?: string;
+    customerBuildingId?: string;
     components?: ComponentKind[];
     hashes?: Partial<Record<ComponentKind, string>>;
   };
@@ -81,9 +79,31 @@ export async function POST(request: Request) {
   }
   const customerWallet = normalizeWallet(customer.wallet_address) as `0x${string}`;
 
-  const buildingId = (body.buildingId || "").trim();
-  const countryCode = (body.countryCode || "").trim().toUpperCase();
-  const postalAddress = (body.postalAddress || "").trim();
+  const customerBuildingId = (body.customerBuildingId || "").trim();
+  if (!customerBuildingId) {
+    return NextResponse.json({ error: "Select a building for this certificate" }, { status: 400 });
+  }
+
+  const { data: building } = await admin
+    .from("customer_buildings")
+    .select("id, building_identifier, postal_address, country_code, archived_at, customer_id")
+    .eq("id", customerBuildingId)
+    .eq("issuer_id", issuer.id)
+    .eq("customer_id", customer.id)
+    .maybeSingle();
+  if (!building) {
+    return NextResponse.json({ error: "Building not found" }, { status: 404 });
+  }
+  if (building.archived_at) {
+    return NextResponse.json(
+      { error: "This building is archived. Create a new building for new certificates." },
+      { status: 409 },
+    );
+  }
+
+  const buildingId = (building.building_identifier || "").trim();
+  const countryCode = (building.country_code || "").trim().toUpperCase();
+  const postalAddress = (building.postal_address || "").trim();
   const selected = new Set(
     (body.components || []).filter((kind): kind is ComponentKind =>
       COMPONENT_KINDS.includes(kind),
@@ -92,12 +112,21 @@ export async function POST(request: Request) {
 
   if (!countryCode || (!buildingId && !postalAddress)) {
     return NextResponse.json(
-      { error: "Country and building id or postal address are required" },
+      { error: "This building is missing an ID or postal address" },
       { status: 400 },
     );
   }
   if (selected.size === 0) {
-    return NextResponse.json({ error: "Select at least one component" }, { status: 400 });
+    return NextResponse.json({ error: "Select at least one certificate type" }, { status: 400 });
+  }
+  const hashes = body.hashes || {};
+  for (const kind of selected) {
+    if (asHash(hashes[kind]) === zeroHash) {
+      return NextResponse.json(
+        { error: "Upload a PDF report. Its hash is required for every selected type." },
+        { status: 400 },
+      );
+    }
   }
   if (!isAddress(issuer.wallet_address)) {
     return NextResponse.json({ error: "Issuer wallet is invalid" }, { status: 400 });
@@ -142,7 +171,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const hashes = body.hashes || {};
   const wallet = getMinterClient();
   let hash: `0x${string}`;
   try {
@@ -199,6 +227,7 @@ export async function POST(request: Request) {
       has_planning: selected.has("planning"),
       status: "minted",
       customer_id: customer.id,
+      customer_building_id: building.id,
     })
     .select("id, token_id, tx_hash")
     .single();

@@ -10,6 +10,7 @@ export type CustomerRecord = {
   onboard_sent_at: string | null;
   onboard_claimed_at: string | null;
   certificate_issuances?: { id: string; token_id: string | null }[];
+  customer_buildings?: { id: string; archived_at: string | null }[];
 };
 
 export function CustomerForm({

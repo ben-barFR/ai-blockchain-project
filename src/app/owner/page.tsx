@@ -37,7 +37,7 @@ export default async function OwnerPage() {
 
   return (
     <OwnerShell email={user.email}>
-      <h1 className="text-3xl font-semibold">My building</h1>
+      <h1 className="text-3xl font-semibold">My buildings</h1>
       <p className="mt-2 text-[var(--muted)]">
         Buildings that have certificates on the wallet linked to your account.
       </p>

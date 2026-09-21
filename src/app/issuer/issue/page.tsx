@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { IssueCertificateForm } from "@/components/issuers/issue-certificate-form";
 import { IssuerShell } from "@/components/layout/issuer-shell";
+import { getSupportEmail } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function IssuerIssuePage() {
@@ -25,11 +26,12 @@ export default async function IssuerIssuePage() {
     <IssuerShell email={user.email}>
       <h1 className="text-3xl font-semibold">Issue a certificate</h1>
       <p className="mt-2 text-[var(--muted)]">
-        Choose a customer with a destination wallet, then mint the token.
+        Select the customer first, then upload the PDF. We read the building from it, match or
+        create a building record, then issue one certificate.
       </p>
       {issuer?.status !== "approved" ? (
         <p className="mt-8 text-sm text-amber-300">
-          Company registration must be approved before you can mint.
+          Company registration must be approved before you can issue certificates.
         </p>
       ) : (
         <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
@@ -37,6 +39,7 @@ export default async function IssuerIssuePage() {
             <IssueCertificateForm
               contractAddress={contractAddress || null}
               issuanceCredits={issuer.issuance_credits ?? 100}
+              supportEmail={getSupportEmail()}
             />
           </Suspense>
         </div>

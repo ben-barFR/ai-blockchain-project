@@ -32,7 +32,14 @@ export function OwnerBuildingList({ walletAddress }: { walletAddress: string }) 
           </p>
           <ul className="mt-3 space-y-1 text-sm text-[var(--muted)]">
             {building.certificates.map((certificate) => (
-              <li key={certificate.tokenId}>Token #{certificate.tokenId}</li>
+              <li key={certificate.tokenId}>
+                <Link
+                  href={`/owner/certificates/${certificate.tokenId}`}
+                  className="hover:text-[var(--foreground)] hover:underline"
+                >
+                  Certificate #{certificate.tokenId}
+                </Link>
+              </li>
             ))}
           </ul>
           <Link

@@ -35,6 +35,18 @@ create table if not exists public.issuer_customers (
   updated_at timestamptz not null default now()
 );
 
+-- Applied remotely: customer buildings (fixed ID + address; certificates hang off the building).
+create table if not exists public.customer_buildings (
+  id uuid primary key default gen_random_uuid(),
+  issuer_id uuid not null references public.issuers (id) on delete cascade,
+  customer_id uuid not null references public.issuer_customers (id) on delete cascade,
+  building_identifier text not null default '',
+  postal_address text not null,
+  country_code text not null,
+  archived_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 -- Applied remotely: archive of wallets from deleted platform accounts.
 create table if not exists public.deleted_accounts (
   id uuid primary key default gen_random_uuid(),

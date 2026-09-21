@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CertificateCard } from "@/components/certificates/certificate-card";
 import { CheckAuthenticityButton } from "@/components/certificates/check-authenticity-button";
-import { ReportAccessButton } from "@/components/certificates/report-access-button";
 import { useOwnedCertificates } from "@/components/certificates/use-owned-certificates";
 import { buildingKey, buildingTitle } from "@/lib/certificates/buildings";
 
@@ -40,17 +40,15 @@ export function OwnerCertificateList({ walletAddress }: { walletAddress: string 
         <CertificateCard
           key={certificate.tokenId}
           certificate={certificate}
+          detailHref={`/owner/certificates/${certificate.tokenId}`}
           actions={
             <div className="flex flex-wrap items-start gap-2">
-              {certificate.components
-                .filter((component) => component.present)
-                .map((component) => (
-                  <ReportAccessButton
-                    key={component.kind}
-                    tokenId={certificate.tokenId}
-                    component={component.kind}
-                  />
-                ))}
+              <Link
+                href={`/owner/certificates/${certificate.tokenId}`}
+                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:border-[var(--muted)]"
+              >
+                View PDF document associated with this certificate
+              </Link>
               <CheckAuthenticityButton certificate={certificate} />
             </div>
           }

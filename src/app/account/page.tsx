@@ -5,6 +5,7 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { IssuerShell } from "@/components/layout/issuer-shell";
 import { OwnerShell } from "@/components/layout/owner-shell";
 import { SiteHeader } from "@/components/layout/site-header";
+import { walletHoldsCertificates } from "@/lib/ethereum/certificates";
 import { ensureProfileWallet } from "@/lib/ethereum/profile-wallet";
 import { createClient } from "@/lib/supabase/server";
 
@@ -22,6 +23,7 @@ export default async function AccountPage() {
     .maybeSingle();
 
   const wallet = await ensureProfileWallet(supabase, user.id);
+  const hasCertificates = await walletHoldsCertificates(wallet.address);
   const userType = profile?.user_type || "owner";
   const isOwner = userType === "owner";
   const isIssuer = userType === "issuer";
@@ -44,6 +46,7 @@ export default async function AccountPage() {
         initialAddress={wallet.address}
         initialPrivateKey={wallet.privateKey}
         initialSource={wallet.source}
+        allowSwitch={!hasCertificates}
       />
     </div>
   );

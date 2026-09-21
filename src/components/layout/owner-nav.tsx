@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 
 const ITEMS = [
-  { href: "/owner", label: "My building", match: (path: string) => path === "/owner" },
+  { href: "/owner", label: "My buildings", match: (path: string) => path === "/owner" },
   {
     href: "/owner/certificates",
     label: "My certificates",

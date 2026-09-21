@@ -78,10 +78,6 @@ export function CompanyPanel({
           label="Accreditation number"
           value={issuer.accreditation_url || "—"}
         />
-        <Detail
-          label="Issuance credits"
-          value={String(issuer.issuance_credits ?? 100)}
-        />
         <div className="sm:col-span-2">
           <dt className="text-[var(--muted)]">Website</dt>
           <dd>

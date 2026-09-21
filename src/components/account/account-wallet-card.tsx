@@ -7,10 +7,12 @@ export function AccountWalletCard({
   initialAddress,
   initialPrivateKey,
   initialSource,
+  allowSwitch = true,
 }: {
   initialAddress: string;
   initialPrivateKey: string | null;
   initialSource: string;
+  allowSwitch?: boolean;
 }) {
   const [address, setAddress] = useState(initialAddress);
   const [privateKey, setPrivateKey] = useState(initialPrivateKey);
@@ -58,16 +60,18 @@ export function AccountWalletCard({
         ) : null}
       </div>
 
-      <div className="mt-6">
-        <p className="mb-2 text-sm font-medium">Switch to an existing wallet</p>
-        <SwitchWalletButton
-          onSwitched={(next) => {
-            setAddress(next);
-            setPrivateKey(null);
-            setSource("linked");
-          }}
-        />
-      </div>
+      {allowSwitch ? (
+        <div className="mt-6">
+          <p className="mb-2 text-sm font-medium">Switch to an existing wallet</p>
+          <SwitchWalletButton
+            onSwitched={(next) => {
+              setAddress(next);
+              setPrivateKey(null);
+              setSource("linked");
+            }}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

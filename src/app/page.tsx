@@ -19,30 +19,37 @@ export default async function Home() {
           Issue, hold, and verify building assessments on Ethereum Sepolia.
         </p>
 
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
-          <PortalCard
-            href="/issuer"
-            title="Certificate issuers"
-            body="Register your company and mint certificate tokens for buildings you assess."
-          />
-          <PortalCard
-            href="/owner"
-            title="Building owners"
-            body="Create an account to get an Ethereum wallet and view certificates you hold."
-          />
-          <PortalCard
-            href="/registry"
-            title="Verification portal"
-            body="Anyone can look up a token or building and check a full-report hash."
-          />
-        </div>
+        <section>
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            <PortalCard
+              href="/issuer"
+              title="Certificate issuers"
+              body="Register your company and issue official certificates for the buildings you assess."
+            />
+            <PortalCard
+              href="/owner"
+              title="Building owners"
+              body="Create an account and keep every certificate issued for your buildings in one place."
+            />
+          </div>
 
-        <p className="mt-8 text-sm text-[var(--muted)]">
-          Already registered?{" "}
-          <Link href="/login" className="text-[var(--accent-hover)] hover:underline">
-            Sign in
-          </Link>
-        </p>
+          <p className="mt-8 text-sm text-[var(--muted)]">
+            Already registered?{" "}
+            <Link href="/login" className="text-[var(--accent-hover)] hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </section>
+
+        <section className="mt-16">
+          <div className="grid gap-4 md:grid-cols-2">
+            <PortalCard
+              href="/registry"
+              title="Verification portal"
+              body="Look up a building and confirm a report is authentic, without relying on a paper copy."
+            />
+          </div>
+        </section>
       </main>
     </>
   );

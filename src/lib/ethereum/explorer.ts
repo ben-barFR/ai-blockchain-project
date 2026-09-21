@@ -22,6 +22,12 @@ export function explorerTxUrl(hash: string) {
   return `${base}/tx/${hash}`;
 }
 
+export function explorerTokenUrl(contractAddress: string, tokenId: string | number | bigint) {
+  const base = getExplorerBaseUrl();
+  if (!base || !contractAddress) return null;
+  return `${base}/nft/${contractAddress}/${tokenId}`;
+}
+
 export function getNetworkLabel() {
   if (getChainId() === 11155111) return "Sepolia";
   if (getChainId() === 31337) return "Hardhat";

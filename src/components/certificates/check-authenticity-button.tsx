@@ -8,8 +8,10 @@ import type { OnChainCertificate } from "@/lib/ethereum/certificates";
 
 export function CheckAuthenticityButton({
   certificate,
+  label = "Check that a PDF document you have is authentic",
 }: {
   certificate: OnChainCertificate;
+  label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,7 @@ export function CheckAuthenticityButton({
     setMatched(null);
     if (!file) return;
     if (hashedComponents.length === 0) {
-      setError("This token has no report hash to check against.");
+      setError("This certificate has no report hash to check against.");
       return;
     }
 
@@ -50,7 +52,7 @@ export function CheckAuthenticityButton({
             error?: string;
           };
           if (!response.ok) {
-            throw new Error(payload.error || "Could not read the token hash");
+            throw new Error(payload.error || "Could not read the certificate hash");
           }
           return { kind: component.kind as ComponentKind, matches: Boolean(payload.matches) };
         }),
@@ -59,11 +61,11 @@ export function CheckAuthenticityButton({
       if (hit) {
         setMatched(true);
         setResult(
-          `This file matches the ${COMPONENT_LABELS[hit.kind].toLowerCase()} hash on token #${certificate.tokenId}.`,
+          `This file matches the ${COMPONENT_LABELS[hit.kind].toLowerCase()} hash on certificate #${certificate.tokenId}.`,
         );
       } else {
         setMatched(false);
-        setResult("This file does not match the report hash stored on this token.");
+        setResult("This file does not match the report hash stored on this certificate.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authenticity check failed");
@@ -86,9 +88,9 @@ export function CheckAuthenticityButton({
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={loading}
-        className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:border-[var(--muted)] disabled:opacity-60"
+        className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-left text-sm hover:border-[var(--muted)] disabled:opacity-60"
       >
-        {loading ? "Checking…" : "Check document authenticity"}
+        {loading ? "Checking…" : label}
       </button>
       {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
       {result ? (

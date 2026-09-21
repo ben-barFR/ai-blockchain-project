@@ -18,7 +18,7 @@ export default async function OwnerCertificatesPage() {
     <OwnerShell email={user.email}>
       <h1 className="text-3xl font-semibold">My certificates</h1>
       <p className="mt-2 text-[var(--muted)]">
-        Certificate tokens held by the wallet on your account.
+        Certificates held by the wallet on your account.
       </p>
       <div className="mt-8">
         <Suspense fallback={<p className="text-sm text-[var(--muted)]">Loading…</p>}>

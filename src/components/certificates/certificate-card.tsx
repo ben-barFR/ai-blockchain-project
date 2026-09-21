@@ -8,16 +8,26 @@ export function CertificateCard({
   certificate,
   revealHolder = true,
   actions,
+  detailHref,
 }: {
   certificate: OnChainCertificate;
   revealHolder?: boolean;
   actions?: ReactNode;
+  detailHref?: string;
 }) {
   return (
     <article className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-[var(--muted)]">Token #{certificate.tokenId}</p>
+          {detailHref ? (
+            <p className="text-sm text-[var(--muted)]">
+              <Link href={detailHref} className="hover:text-[var(--foreground)] hover:underline">
+                Certificate #{certificate.tokenId}
+              </Link>
+            </p>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">Certificate #{certificate.tokenId}</p>
+          )}
           <h2 className="text-xl font-semibold">
             {certificate.buildingId || "No cadastral id"}
           </h2>
@@ -33,6 +43,10 @@ export function CertificateCard({
       </div>
 
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-[var(--muted)]">Certificate ID</dt>
+          <dd>{certificate.tokenId}</dd>
+        </div>
         <div>
           <dt className="text-[var(--muted)]">Issuer identifier</dt>
           <dd>{certificate.issuerIdentifier || "—"}</dd>
@@ -94,7 +108,7 @@ export function CertificateCard({
                 {component.invalidated ? " · Invalidated" : ""}
               </p>
               <p className="mt-1 break-all font-mono text-xs text-[var(--muted)]">
-                Report hash: {zeroHash(component.reportHash) ? "Not on token" : component.reportHash}
+                Report hash: {zeroHash(component.reportHash) ? "Not on certificate" : component.reportHash}
               </p>
             </li>
           ))}

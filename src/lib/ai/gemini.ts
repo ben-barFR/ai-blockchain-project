@@ -5,4 +5,4 @@ export const google = createGoogleGenerativeAI({
 });
 
 /** Default fast model for chat / agent loops */
-export const geminiModel = google("gemini-2.5-flash");
+export const geminiModel = google("gemini-3.6-flash");

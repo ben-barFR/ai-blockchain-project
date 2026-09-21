@@ -1,10 +1,11 @@
-import { createPublicClient, http, type Address, type Hex } from "viem";
+import { createPublicClient, http, isAddress, type Address, type Hex } from "viem";
 import { COMPONENT_INDEX, COMPONENT_KINDS, type ComponentKind } from "@/lib/certificates/constants";
 import {
   getCertificateContract,
   getChain,
   getPublicClient,
   getRpcUrl,
+  isContractConfigured,
 } from "@/lib/ethereum/client";
 
 export type OnChainComponent = {
@@ -85,6 +86,16 @@ export async function readTokensOf(holder: Address) {
   });
 }
 
+export async function walletHoldsCertificates(address: string) {
+  if (!isContractConfigured() || !isAddress(address)) return false;
+  try {
+    const tokenIds = await readTokensOf(address);
+    return tokenIds.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function readTokensByBuilding(countryCode: string, buildingId: string) {
   const client = getPublicClient();
   return client.readContract({
@@ -92,6 +103,106 @@ export async function readTokensByBuilding(countryCode: string, buildingId: stri
     functionName: "tokensByBuilding",
     args: [countryCode, buildingId],
   });
+}
+
+function normalizeBuildingLookup(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export async function readTokensByBuildingId(buildingId: string) {
+  const wanted = normalizeBuildingLookup(buildingId);
+  if (!wanted) return [];
+
+  const prefix = buildingId.trim().slice(0, 2).toUpperCase();
+  if (/^[A-Z]{2}$/.test(prefix)) {
+    const indexed = await readTokensByBuilding(prefix, buildingId.trim());
+    if (indexed.length > 0) return indexed;
+  }
+
+  const client = getPublicClient();
+  const contract = getCertificateContract();
+  const tokenIds: bigint[] = [];
+  const batchSize = 10n;
+  let start = 1n;
+  const maxId = 1000n;
+
+  while (start <= maxId) {
+    const ids = Array.from({ length: Number(batchSize) }, (_, index) => start + BigInt(index));
+    const rows = await Promise.all(
+      ids.map(async (tokenId) => {
+        try {
+          const meta = await client.readContract({
+            ...contract,
+            functionName: "getCertificateMeta",
+            args: [tokenId],
+          });
+          return { tokenId, buildingId: meta[0] };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    let reachedEnd = false;
+    for (const row of rows) {
+      if (!row) {
+        reachedEnd = true;
+        break;
+      }
+      if (normalizeBuildingLookup(row.buildingId) === wanted) {
+        tokenIds.push(row.tokenId);
+      }
+    }
+    if (reachedEnd) break;
+    start += batchSize;
+  }
+
+  return tokenIds;
+}
+
+export async function readTokensByPostalAddress(postalAddress: string) {
+  const wanted = normalizeBuildingLookup(postalAddress);
+  if (!wanted) return [];
+
+  const client = getPublicClient();
+  const contract = getCertificateContract();
+  const tokenIds: bigint[] = [];
+  const batchSize = 10n;
+  let start = 1n;
+  const maxId = 1000n;
+
+  while (start <= maxId) {
+    const ids = Array.from({ length: Number(batchSize) }, (_, index) => start + BigInt(index));
+    const rows = await Promise.all(
+      ids.map(async (tokenId) => {
+        try {
+          const meta = await client.readContract({
+            ...contract,
+            functionName: "getCertificateMeta",
+            args: [tokenId],
+          });
+          return { tokenId, postalAddress: meta[2] };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    let reachedEnd = false;
+    for (const row of rows) {
+      if (!row) {
+        reachedEnd = true;
+        break;
+      }
+      if (normalizeBuildingLookup(row.postalAddress) === wanted) {
+        tokenIds.push(row.tokenId);
+      }
+    }
+    if (reachedEnd) break;
+    start += batchSize;
+  }
+
+  return tokenIds;
 }
 
 export async function verifyOnChainHash(tokenId: bigint, kind: ComponentKind, reportHash: Hex) {

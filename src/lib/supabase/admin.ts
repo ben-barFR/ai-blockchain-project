@@ -26,3 +26,12 @@ export function isAdminUser(
 ) {
   return isAdminEmail(email) || userType === "admin";
 }
+
+export function getSupportEmail() {
+  return (
+    (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((value) => value.trim())
+      .find(Boolean) || ""
+  );
+}

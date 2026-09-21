@@ -87,6 +87,9 @@ export function CustomerList() {
 
       <ul className="space-y-3">
         {customers.map((customer) => {
+          const buildingCount = (customer.customer_buildings || []).filter(
+            (building) => !building.archived_at,
+          ).length;
           const certCount = customer.certificate_issuances?.length || 0;
           const inviteSent = Boolean(customer.onboard_sent_at) && !customer.wallet_address;
           return (
@@ -109,6 +112,8 @@ export function CustomerList() {
                   </p>
                   <p className="mt-2 text-sm text-[var(--muted)]">
                     <Link href={`/issuer/customers/${customer.id}`} className="hover:underline">
+                      {buildingCount} {buildingCount === 1 ? "building" : "buildings"}
+                      {" · "}
                       {certCount} {certCount === 1 ? "certificate" : "certificates"}
                     </Link>
                   </p>

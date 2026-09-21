@@ -1,84 +1,259 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { COMPONENT_KINDS, COMPONENT_LABELS, type ComponentKind } from "@/lib/certificates/constants";
+import { useState } from "react";
+import Link from "next/link";
 import { hashFile } from "@/lib/certificates/hash";
+import { isPdfFile, MAX_REPORT_PDF_BYTES } from "@/lib/certificates/report-file";
+
+type Match = {
+  tokenId: string;
+  buildingId: string;
+  postalAddress: string;
+  countryCode: string;
+  component: string;
+  componentLabel: string;
+  valid: boolean;
+  invalidated: boolean;
+};
+
+function PdfPicker({
+  file,
+  reading,
+  onChange,
+}: {
+  file: File | null;
+  reading: boolean;
+  onChange: (file: File | undefined) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-[var(--accent)]/70 bg-[var(--accent)]/10 p-4">
+      <p className="text-sm font-medium">PDF report</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <label className="relative inline-flex cursor-pointer items-center justify-center rounded-lg bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white hover:bg-[var(--accent-hover)]">
+          <input
+            type="file"
+            accept="application/pdf"
+            className="absolute inset-0 cursor-pointer opacity-0"
+            onChange={(event) => {
+              const next = event.target.files?.[0];
+              onChange(next);
+              event.target.value = "";
+            }}
+          />
+          {file ? "Replace PDF" : "Choose PDF report"}
+        </label>
+        <span className="text-sm text-[var(--muted)]">
+          {reading ? "Reading report…" : file ? file.name : "No file chosen"}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export function HashVerifier() {
-  const [result, setResult] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [reading, setReading] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [buildingId, setBuildingId] = useState("");
+  const [postalAddress, setPostalAddress] = useState("");
+  const [countryCode, setCountryCode] = useState("");
+  const [showFields, setShowFields] = useState(false);
+  const [found, setFound] = useState<boolean | null>(null);
+  const [authentic, setAuthentic] = useState<boolean | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function parsePdf(nextFile: File) {
+    setReading(true);
+    setParseError(null);
     setError(null);
-    setResult(null);
-    const form = new FormData(event.currentTarget);
-    const tokenId = String(form.get("tokenId") || "");
-    const component = String(form.get("component") || "") as ComponentKind;
-    const file = form.get("file");
-    if (!(file instanceof File) || !tokenId) {
-      setError("Token id and PDF are required");
+    setFound(null);
+    setAuthentic(null);
+    setMatches([]);
+    try {
+      const form = new FormData();
+      form.set("file", nextFile);
+      const response = await fetch("/api/certificates/parse-report", {
+        method: "POST",
+        body: form,
+      });
+      const payload = (await response.json()) as {
+        buildingId?: string;
+        postalAddress?: string;
+        countryCode?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        setBuildingId("");
+        setPostalAddress("");
+        setCountryCode("");
+        setParseError(payload.error || "Could not read this PDF");
+        return;
+      }
+      setBuildingId(payload.buildingId || "");
+      setPostalAddress(payload.postalAddress || "");
+      setCountryCode(payload.countryCode || "");
+    } catch (err) {
+      setBuildingId("");
+      setPostalAddress("");
+      setCountryCode("");
+      setParseError(err instanceof Error ? err.message : "Could not read this PDF");
+    } finally {
+      setShowFields(true);
+      setReading(false);
+    }
+  }
+
+  async function onPdfChange(nextFile: File | undefined) {
+    setFile(null);
+    setShowFields(false);
+    setParseError(null);
+    setError(null);
+    setFound(null);
+    setAuthentic(null);
+    setMatches([]);
+    setBuildingId("");
+    setPostalAddress("");
+    setCountryCode("");
+    if (!nextFile) return;
+    if (!isPdfFile(nextFile)) {
+      setError("Upload a PDF report");
       return;
     }
-    setLoading(true);
-    const reportHash = await hashFile(file);
-    const response = await fetch("/api/certificates/verify-hash", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tokenId, component, reportHash }),
-    });
-    const payload = (await response.json()) as {
-      matches?: boolean;
-      error?: string;
-      certificate?: { postalAddress?: string; buildingId?: string };
-    };
-    setLoading(false);
-    if (!response.ok) {
-      setError(payload.error || "Verification failed");
+    if (nextFile.size > MAX_REPORT_PDF_BYTES) {
+      setError("PDF must be 12 MB or smaller");
       return;
     }
-    if (payload.matches) {
-      setResult(
-        `This PDF matches token #${tokenId} (${COMPONENT_LABELS[component]}) for ${payload.certificate?.buildingId || "the building"} at ${payload.certificate?.postalAddress || "the on-chain address"}.`,
-      );
-    } else {
-      setResult("This PDF does not match the hash stored on that certificate token.");
+    setFile(nextFile);
+    await parsePdf(nextFile);
+  }
+
+  async function checkCertificate() {
+    if (!file) {
+      setError("Upload a PDF report first.");
+      return;
+    }
+    if (!buildingId.trim() && !postalAddress.trim()) {
+      setError("Enter a building ID or postal address.");
+      return;
+    }
+    setChecking(true);
+    setError(null);
+    setFound(null);
+    setAuthentic(null);
+    setMatches([]);
+    try {
+      const reportHash = await hashFile(file);
+      const response = await fetch("/api/certificates/verify-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          buildingId: buildingId.trim(),
+          postalAddress: postalAddress.trim(),
+          countryCode: countryCode.trim(),
+          reportHash,
+        }),
+      });
+      const payload = (await response.json()) as {
+        found?: boolean;
+        authentic?: boolean;
+        matches?: Match[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not check this certificate");
+      }
+      setFound(Boolean(payload.found));
+      setAuthentic(Boolean(payload.authentic));
+      setMatches(payload.matches || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not check this certificate");
+    } finally {
+      setChecking(false);
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
-      <h2 className="text-lg font-semibold">Verify a full report</h2>
-      <p className="text-sm text-[var(--muted)]">
-        If someone sent you a PDF, check that its hash is the one stored on a given token.
-      </p>
-      <input
-        name="tokenId"
-        required
-        placeholder="Token id"
-        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-      />
-      <select
-        name="component"
-        className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-      >
-        {COMPONENT_KINDS.map((kind) => (
-          <option key={kind} value={kind}>
-            {COMPONENT_LABELS[kind]}
-          </option>
-        ))}
-      </select>
-      <input name="file" type="file" accept="application/pdf" required className="w-full text-sm" />
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-60"
-      >
-        {loading ? "Checking…" : "Check hash"}
-      </button>
+    <div className="space-y-4">
+      <PdfPicker file={file} reading={reading} onChange={(next) => void onPdfChange(next)} />
+
+      {parseError ? (
+        <p className="text-sm text-red-300">
+          PDF parsing failed ({parseError}){" "}
+          {file ? (
+            <button
+              type="button"
+              onClick={() => void parsePdf(file)}
+              disabled={reading}
+              className="text-[var(--accent-hover)] hover:underline disabled:opacity-60"
+            >
+              Retry
+            </button>
+          ) : null}
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {result ? <p className="text-sm text-emerald-300">{result}</p> : null}
-    </form>
+
+      {showFields && !reading ? (
+        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6">
+          <label className="block text-sm">
+            Building ID
+            <input
+              value={buildingId}
+              onChange={(event) => setBuildingId(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            Postal address
+            <textarea
+              value={postalAddress}
+              onChange={(event) => setPostalAddress(event.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => void checkCertificate()}
+            disabled={checking || !file}
+            className="rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--accent-hover)] disabled:opacity-60"
+          >
+            {checking ? "Checking…" : "Check certificate"}
+          </button>
+        </div>
+      ) : null}
+
+      {found === false ? (
+        <p className="text-sm text-amber-300">No certificate was found on the chain for this building.</p>
+      ) : null}
+      {found && authentic === false ? (
+        <p className="text-sm text-amber-300">
+          We could not confirm the authenticity of this document.
+        </p>
+      ) : null}
+      {found && authentic && matches.length > 0 ? (
+        <div className="space-y-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
+          <p className="text-emerald-200">This document matches a certificate on the chain.</p>
+          <ul className="space-y-2">
+            {matches.map((match) => (
+              <li key={`${match.tokenId}-${match.component}`}>
+                <Link
+                  href={`/registry/${match.tokenId}`}
+                  className="text-[var(--accent-hover)] hover:underline"
+                >
+                  Certificate ID {match.tokenId}
+                </Link>
+                <span className="text-[var(--muted)]">
+                  {" "}
+                  · {match.componentLabel} · {match.valid ? "Valid" : "Invalid"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }

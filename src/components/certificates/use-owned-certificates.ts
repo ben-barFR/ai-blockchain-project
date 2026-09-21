@@ -22,7 +22,7 @@ export function useOwnedCertificates(walletAddress: string) {
           certificates?: OnChainCertificate[];
           error?: string;
         };
-        if (!response.ok) throw new Error(payload.error || "Could not read wallet tokens");
+        if (!response.ok) throw new Error(payload.error || "Could not read wallet certificates");
         if (!cancelled) setCertificates(payload.certificates || []);
       })
       .catch((err: Error) => {
